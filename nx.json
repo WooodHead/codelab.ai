@@ -168,6 +168,9 @@
     },
     "modules-page-stories": {
       "tags": []
+    },
+    "modules-demo-grid-form": {
+      "tags": []
     }
   }
 }
