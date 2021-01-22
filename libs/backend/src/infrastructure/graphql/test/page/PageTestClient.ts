@@ -1,9 +1,14 @@
 import { FetchResult } from '@apollo/client'
 import gql from 'graphql-tag'
+import Observable from 'zen-observable'
 import { TestClientBase } from '../TestClientBase'
 
 export interface ICreatePage {
   createPage: string
+}
+
+export interface IPageCreated {
+  pageCreated: { id: string; title: string }
 }
 
 export class PageTestClient extends TestClientBase {
@@ -17,6 +22,16 @@ export class PageTestClient extends TestClientBase {
 				  createPage(input: {title: "${title}", appId: "${appId}"})
 				}
 			`),
+    })
+  }
+
+  pageCreated$(): Observable<FetchResult<IPageCreated>> {
+    return this.client.subscribe({
+      query: gql(`
+        subscription {
+          pageCreated {id title}
+        }
+      `),
     })
   }
 }
