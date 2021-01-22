@@ -15,7 +15,7 @@ import { PageModule } from '../../../../framework/nestjs/PageModule'
 const email = 'test_user@codelab.ai'
 const password = 'password'
 
-describe('CreatePageUseCase', () => {
+describe.skip('CreatePageUseCase', () => {
   let app: INestApplication
   let connection: Connection
   let testClient: TestClientApollo
