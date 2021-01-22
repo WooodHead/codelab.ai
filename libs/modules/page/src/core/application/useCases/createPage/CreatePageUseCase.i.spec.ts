@@ -2,7 +2,12 @@ import { INestApplication } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
 import { Connection } from 'typeorm'
+import { initializeTransactionalContext } from 'typeorm-transactional-cls-hooked'
 import { TestInfrastructureModule } from '../../../../../../../backend/src/framework/nestjs/test-infrastructure.module'
+import { TestClientApollo } from '../../../../../../../backend/src/infrastructure/graphql/test/TestClientApollo'
+import { AppTestClient } from '../../../../../../../backend/src/infrastructure/graphql/test/app/AppTestClient'
+import { PageTestClient } from '../../../../../../../backend/src/infrastructure/graphql/test/page/PageTestClient'
+import { UserTestClient } from '../../../../../../../backend/src/infrastructure/graphql/test/user/UserTestClient'
 import { AppModule } from '../../../../../../app/src/framework/nestjs/AppModule'
 import { GraphModule } from '../../../../../../graph/src/framework/nestjs/GraphModule'
 import { LoginUserInput } from '../../../../../../user/src/core/application/useCases/loginUser/LoginUserInput'
@@ -38,11 +43,13 @@ const registerUserMutation = (registerUserInput: RegisterUserInput) => `
 describe.skip('CreatePageUseCase', () => {
   let app: INestApplication
   let connection: Connection
+  let testClient: TestClientApollo
 
   beforeAll(async () => {
     const testModule = await Test.createTestingModule({
       imports: [
         TestInfrastructureModule,
+        // CqrsModule,
         PageModule,
         GraphModule,
         UserModule,
@@ -52,19 +59,44 @@ describe.skip('CreatePageUseCase', () => {
 
     app = testModule.createNestApplication()
     connection = app.get(Connection)
+    const port = 3000
+
     await connection.synchronize(true)
+    initializeTransactionalContext()
     await app.init()
+    await app.listen(port, 'localhost', () => {
+      console.log(`Listening at http://localhost:${port}`)
+    })
+    testClient = new TestClientApollo(`http://localhost:${port}/graphql`)
   })
 
   afterAll(async () => {
     await app.close()
   })
 
-  // it('should be true', () => {
-  //   expect(true).toBeTruthy()
-  // })
+  it('should be true', async () => {
+    const userClient = new UserTestClient(testClient)
+    const registerUserResult = await userClient.registerUser(email, password)
+    const accessToken = registerUserResult.data?.registerUser.accessToken
 
-  it('should create page with graph and a root vertex', async () => {
+    expect(registerUserResult.data?.registerUser.email).toEqual(email)
+    expect(accessToken).toBeDefined()
+
+    testClient.setToken(accessToken as string)
+
+    const appClient = new AppTestClient(testClient)
+    const newAppResult = await appClient.createApp('Test app')
+    const appId = newAppResult.data?.createApp.id
+
+    expect(appId).toBeDefined()
+    const pageClient = new PageTestClient(testClient)
+    const newPageResult = await pageClient.createPage('Page 1', appId as string)
+    const a = ''
+
+    expect(true).toBeTruthy()
+  })
+
+  it.skip('should create page with graph and a root vertex', async () => {
     await request(app.getHttpServer())
       .post('/graphql')
       .send({
