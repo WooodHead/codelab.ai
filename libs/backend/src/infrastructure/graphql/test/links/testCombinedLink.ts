@@ -1,14 +1,15 @@
 import { ApolloLink } from '@apollo/client'
+import { testCodelabLink } from '../../../../../../frontend/src/model/store/apollo/links/testCodelabLink'
 import { testAuthLink } from './testAuthLink'
 import { testErrorLink } from './testErrorLink'
-import { testWsLink } from './testWsLink'
 
 export const testCombinedLink = (url: string, token?: string): ApolloLink => {
   return token
     ? ApolloLink.from([
-        testErrorLink,
+        // testWsLink(url, token),
         testAuthLink(token),
-        testWsLink(url, token),
+        testErrorLink,
+        testCodelabLink(url),
       ])
-    : ApolloLink.from([testErrorLink])
+    : ApolloLink.from([testErrorLink, testCodelabLink(url)])
 }
