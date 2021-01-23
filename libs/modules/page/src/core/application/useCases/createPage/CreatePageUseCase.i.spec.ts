@@ -1,10 +1,17 @@
-import { ApolloClient, NormalizedCacheObject } from '@apollo/client'
+import {
+  ApolloClient,
+  FetchResult,
+  NormalizedCacheObject,
+} from '@apollo/client'
 import { INestApplication } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import { Connection } from 'typeorm'
 import { initializeTransactionalContext } from 'typeorm-transactional-cls-hooked'
 import { TestInfrastructureModule } from '../../../../../../../backend/src/framework/nestjs/test-infrastructure.module'
 import { getApolloTestClient } from '../../../../../../../backend/src/infrastructure/graphql/test/apolloTestClient'
+import { ICreateApp } from '../../../../../../../backend/src/infrastructure/graphql/test/interface/ICreateApp'
+import { IRegisterUser } from '../../../../../../../backend/src/infrastructure/graphql/test/interface/IRegisterUser'
+import { CreateAppGql } from '../../../../../../app-stories/src/useCases/createApp/CreateAppInput.generated'
 import { AppModule } from '../../../../../../app/src/framework/nestjs/AppModule'
 import { GraphModule } from '../../../../../../graph/src/framework/nestjs/GraphModule'
 import { UserModule } from '../../../../../../user/src/framework/nestjs/UserModule'
@@ -19,6 +26,7 @@ describe.skip('CreatePageUseCase', () => {
   let app: INestApplication
   let connection: Connection
   let testClient: ApolloClient<NormalizedCacheObject>
+  let url = ''
 
   beforeAll(async () => {
     const testModule = await Test.createTestingModule({
@@ -33,7 +41,10 @@ describe.skip('CreatePageUseCase', () => {
 
     app = testModule.createNestApplication()
     connection = app.get(Connection)
+
     const port = 3000
+
+    url = `http://localhost:${port}/graphql`
 
     await connection.synchronize(true)
     initializeTransactionalContext()
@@ -41,43 +52,41 @@ describe.skip('CreatePageUseCase', () => {
     await app.listen(port, 'localhost', () => {
       console.log(`Listening at http://localhost:${port}`)
     })
-    // testClient = new TestClientApollo(`http://localhost:${port}/graphql`)
-    testClient = getApolloTestClient(`http://localhost:${port}/graphql`)
-    const a = ''
+    testClient = getApolloTestClient(url)
   })
 
   afterAll(async () => {
     await app.close()
   })
 
-  // it('should create page with graph and a root vertex', async (done) => {
   it('should create page with graph and a root vertex', async (done) => {
-    const registerUserResult = mutate(testClient, {
-      mutation: RegisterUserGql,
+    const registerUserResult: FetchResult<IRegisterUser> = await mutate(
+      testClient,
+      {
+        mutation: RegisterUserGql,
+        variables: {
+          input: { email, password },
+        },
+      },
+    )
+
+    const accessToken = registerUserResult.data?.registerUser.accessToken
+
+    expect(accessToken).toBeDefined()
+
+    testClient = getApolloTestClient(url, accessToken)
+
+    const newAppResult: FetchResult<ICreateApp> = await mutate(testClient, {
+      mutation: CreateAppGql,
       variables: {
-        input: { email, password },
+        input: { title: 'Test App' },
       },
     })
+    const appId = newAppResult.data?.createApp.id
 
-    expect(true).toBeTruthy()
+    expect(appId).toBeDefined()
   })
 
-  //   const pageClient = new PageTestClient(testClient)
-  //
-  //   const userClient = new UserTestClient(testClient)
-  //   const registerUserResult = await userClient.registerUser(email, password)
-  //   const accessToken = registerUserResult.data?.registerUser.accessToken
-  //
-  //   expect(registerUserResult.data?.registerUser.email).toEqual(email)
-  //   expect(accessToken).toBeDefined()
-  //
-  //   testClient.setToken(accessToken as string)
-  //
-  //   const appClient = new AppTestClient(testClient)
-  //   const newAppResult = await appClient.createApp('Test app')
-  //   const appId = newAppResult.data?.createApp.id
-  //
-  //   expect(appId).toBeDefined()
   //   await pageClient.createPage('Page 1', appId as string)
   //
   //   const sub = pageClient.pageCreated$().subscribe((result) => {
